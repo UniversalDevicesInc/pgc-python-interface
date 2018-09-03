@@ -69,7 +69,7 @@ class Interface(object):
 
     __exists = False
 
-    def __init__(self):
+    def __init__(self, name = False):
         if self.__exists:
             warnings.warn('Only one Interface is allowed.')
             return
