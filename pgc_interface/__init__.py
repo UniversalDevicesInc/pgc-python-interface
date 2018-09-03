@@ -1,4 +1,4 @@
-__version__ = '1.0.1'
+__version__ = '1.0.2'
 __description__ = 'PGC Interface'
 __url__ = 'https://github.com/UniversalDevicesInc/pgc-python-interface'
 __author__ = 'James Milne'
