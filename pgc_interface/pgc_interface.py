@@ -106,11 +106,11 @@ class Interface(object):
                 data = self.sock.recv(4096)
                 msg = None
                 payload = data.decode('utf-8')
-                if payload.find('*\r\n') < 0:
+                if payload.find('\r\n') < 0:
                     buffer += payload
                 else:
-                    msg = buffer + payload[:payload.find('*\r\n')]
-                    buffer = payload[payload.find('*\r\n') + 4:]
+                    msg = buffer + payload[:payload.find('\r\n')]
+                    buffer = payload[payload.find('\r\n') + 3:]
                 if msg is not None:
                     parsed_msg = json.loads(data)
                     inputCmds = ['query', 'command', 'result', 'status', 'shortPoll', 'longPoll', 'delete']
@@ -162,7 +162,7 @@ class Interface(object):
             warnings.warn('payload not a dictionary')
             return False
 
-        self.sock.sendall((json.dumps(message) + '\n').encode('utf-8'))
+        self.sock.sendall((json.dumps(message) + '\r\n').encode('utf-8'))
 
     def addNode(self, node):
         """
