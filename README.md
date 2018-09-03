@@ -26,7 +26,6 @@ The module is updated in Pypi (Python's package interface Pip) on a regular basi
 pip install pgc_interface --user
 ```
 
-
 ### Starting your NodeServer build
 
 When you start building a NodeServer you are helping build the free and open Internet of Things. Thank you! If you run in to any issues please ask your questions on the [UDI Polyglot Forums](http://forum.universal-devices.com/forum/111-polyglot/).
