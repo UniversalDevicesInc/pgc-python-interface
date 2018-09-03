@@ -1,12 +1,12 @@
-[![Build Status](https://travis-ci.org/UniversalDevicesInc/polyglot-v2-python-interface.svg?branch=master)](https://travis-ci.org/UniversalDevicesInc/polyglot-v2-python-interface)
+[![Build Status](https://travis-ci.org/UniversalDevicesInc/pgc-python-interface.svg?branch=master)](https://travis-ci.org/UniversalDevicesInc/pgc-python-interface)
 
-# UDI Polyglot v2 Interface Module
+# UDI Polyglot v2 Interface Module :: PGC
 
 This is the Polyglot interface API module that is portable to be imported into your Python 3.4+ based NodeServers.
 
 ### Installation
 
-Pip > 9 should be installed. This typically isn't the case, so you will have to upgrade Pip first.
+Pip > 9 should be installed. 
 
 ```
 # Check your pip version
@@ -23,7 +23,7 @@ The module is updated in Pypi (Python's package interface Pip) on a regular basi
 
 ```
 # Install the Polyglot interface
-pip install polyinterface --user
+pip install pgc_interface --user
 ```
 
 
