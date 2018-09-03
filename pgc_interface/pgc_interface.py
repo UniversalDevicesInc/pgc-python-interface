@@ -20,8 +20,11 @@ import re
 import sys
 import select
 import socket
+import struct
 import threading
 import warnings
+
+from multiprocessing.connection import Client
 
 # from polyinterface import __features__
 
@@ -101,35 +104,39 @@ class Interface(object):
     def _message(self):
         self.sock.connect(SOCKETFILE)
         buffer = ''
+        messages = []
         while self.running:
             try:
                 data = self.sock.recv(4096)
-                msg = None
                 payload = data.decode('utf-8')
-                if payload.find('\r\n') < 0:
-                    buffer += payload
+                messages = payload.split('\n')
+                if messages[len(messages) - 1] == '':
+                    if buffer is not '':
+                        messages[0] = '{}{}'.format(buffer, messages[0])
+                        buffer = ''
+                    messages.pop()
                 else:
-                    msg = buffer + payload[:payload.find('\r\n')]
-                    buffer = payload[payload.find('\r\n') + 3:]
-                if msg is not None:
-                    parsed_msg = json.loads(data)
-                    inputCmds = ['query', 'command', 'result', 'status', 'shortPoll', 'longPoll', 'delete']
-                    for key in parsed_msg:
-                        LOGGER.debug('Received Message: {}'.format(parsed_msg))
-                        if key == 'init':
-                            self.init = parsed_msg[key]
-                            self.inConfig(parsed_msg[key])
-                        elif key == 'config':
-                            self.inConfig(parsed_msg[key])
-                        elif key == 'stop':
-                            LOGGER.debug('Received stop from Polyglot... Shutting Down.')
-                            self.stop()
-                        elif key in inputCmds:
-                            self.inQueue.put(parsed_msg)
-                        else:
-                            LOGGER.error('Invalid command received in message from Polyglot: {}'.format(key))
+                    buffer += messages.pop()
+                for msg in messages:
+                    if msg is not '' or msg is not None:
+                        parsed_msg = json.loads(msg)
+                        inputCmds = ['query', 'command', 'result', 'status', 'shortPoll', 'longPoll', 'delete']
+                        for key in parsed_msg:
+                            LOGGER.debug('Received Message: {}'.format(parsed_msg))
+                            if key == 'init':
+                                self.init = parsed_msg[key]
+                                self.inConfig(parsed_msg[key])
+                            elif key == 'config':
+                                self.inConfig(parsed_msg[key])
+                            elif key == 'stop':
+                                LOGGER.debug('Received stop from Polyglot... Shutting Down.')
+                                self.stop()
+                            elif key in inputCmds:
+                                self.inQueue.put(parsed_msg)
+                            else:
+                                LOGGER.error('Invalid command received in message from Polyglot: {}'.format(key))
             except (ValueError, json.decoder.JSONDecodeError) as err:
-                LOGGER.error('Received Payload Error: {} :: {}'.format(err, msg), exc_info=True)
+                LOGGER.error('Received Payload Error: {} :: {}'.format(err, repr(msg)), exc_info=True)
 
     def start(self):
         """
@@ -162,7 +169,7 @@ class Interface(object):
             warnings.warn('payload not a dictionary')
             return False
 
-        self.sock.sendall((json.dumps(message) + '\r\n').encode('utf-8'))
+        self.sock.sendall((json.dumps(message) + '\n').encode('utf-8'))
 
     def addNode(self, node):
         """
