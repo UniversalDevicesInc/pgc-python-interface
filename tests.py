@@ -4,8 +4,8 @@ import pgc_interface
 class TestPoly(unittest.TestCase):
 
     def test_poly(self):
-        polyglot = polyinterface.Interface('Test')
-        self.assertIsInstance(polyglot, polyinterface.Interface)
+        polyglot = pgc_interface.Interface('Test')
+        self.assertIsInstance(polyglot, pgc_interface.Interface)
 
 
 if __name__ == "__main__":
