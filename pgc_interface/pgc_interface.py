@@ -106,11 +106,11 @@ class Interface(object):
                 data = self.sock.recv(4096)
                 msg = None
                 payload = data.decode('utf-8')
-                if payload.find('\n') < 0:
+                if payload.find('*\r\n') < 0:
                     buffer += payload
                 else:
-                    msg = buffer + payload[:payload.find('\n')]
-                    buffer = payload[payload.find('\n') + 1:]
+                    msg = buffer + payload[:payload.find('*\r\n')]
+                    buffer = payload[payload.find('*\r\n') + 4:]
                 if msg is not None:
                     parsed_msg = json.loads(data)
                     inputCmds = ['query', 'command', 'result', 'status', 'shortPoll', 'longPoll', 'delete']
