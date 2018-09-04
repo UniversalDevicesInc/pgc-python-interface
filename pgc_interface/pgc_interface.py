@@ -429,7 +429,6 @@ class Controller(Node):
             self.nodesAdding = []
             self._threads = []
             self._startThreads()
-            self._gotConfig(self.poly.init)
         except (KeyError) as err:
             LOGGER.error('Error Creating node: {}'.format(err), exc_info=True)
 
