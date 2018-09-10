@@ -24,10 +24,10 @@ import struct
 import threading
 import warnings
 
-from multiprocessing.connection import Client
-
 # from polyinterface import __features__
 
+SOCKETFILE = '/tmp/pgsocket.sock'
+LOGFILE = '/tmp/pglog.sock'
 
 def warning_on_one_line(message, category, filename, lineno, file=None, line=None):
     return '{}:{}: {}: {}'.format(filename, lineno, category.__name__, message)
@@ -51,9 +51,10 @@ def setup_log():
     # Make a handler that writes to a file,
     # making a new file at midnight and keeping 3 backups
     # handler = logging.handlers.TimedRotatingFileHandler(log_filename, when="midnight", backupCount=30)
-    handler = logging.StreamHandler(sys.stdout)
+    handler = logging.handlers.SysLogHandler(LOGFILE, socktype=socket.SOCK_STREAM)
     # Format each log message like this
     formatter = logging.Formatter('[%(threadName)-8.8s] [%(levelname)-7s]: %(message)s')
+    # formatter = logging.Formatter('{"log": {"thread": "%(threadName)s", "levelname": "%(levelname)s", "msg": "%(message)s"}}')
     # Attach the formatter to the handler
     handler.setFormatter(formatter)
     # Attach the handler to the logger
@@ -62,8 +63,6 @@ def setup_log():
     return logger
 
 LOGGER = setup_log()
-
-SOCKETFILE = '/tmp/pgsocket.sock'
 
 class Interface(object):
 
@@ -107,7 +106,7 @@ class Interface(object):
         messages = []
         while self.running:
             try:
-                data = self.sock.recv(4096)
+                data = self.sock.recv(7168)
                 payload = data.decode('utf-8')
                 messages = payload.split('\n')
                 if messages[len(messages) - 1] == '':
@@ -122,16 +121,18 @@ class Interface(object):
                         parsed_msg = json.loads(msg)
                         inputCmds = ['query', 'command', 'result', 'status', 'shortPoll', 'longPoll', 'delete']
                         for key in parsed_msg:
-                            LOGGER.debug('Received Message: {}'.format(parsed_msg))
                             if key == 'init':
+                                LOGGER.debug('Recieved Message: init')
                                 self.init = parsed_msg[key]
                                 self.inConfig(parsed_msg[key])
                             elif key == 'config':
+                                LOGGER.debug('Recieved Message: config')
                                 self.inConfig(parsed_msg[key])
                             elif key == 'stop':
                                 LOGGER.debug('Received stop from Polyglot... Shutting Down.')
                                 self.stop()
                             elif key in inputCmds:
+                                LOGGER.debug('Received Message: {}'.format(parsed_msg))
                                 self.inQueue.put(parsed_msg)
                             else:
                                 LOGGER.error('Invalid command received in message from Polyglot: {}'.format(key))
@@ -145,9 +146,6 @@ class Interface(object):
         """
         for _, thread in self._threads.items():
             thread.start()
-
-        while self.init is None:
-            time.sleep(1)
         self.send({ 'connected': True })
 
     def stop(self):
@@ -304,35 +302,40 @@ class Node(object):
             newFormat = {}
             for driver in drivers:
                 newFormat[driver['driver']] = {}
-                newFormat[driver['driver']]['value'] = driver['value']
-                newFormat[driver['driver']]['uom'] = driver['uom']
+                newFormat[driver['driver']]['value'] = str(driver['value'])
+                newFormat[driver['driver']]['uom'] = str(driver['uom'])
             return newFormat
         else:    
             return deepcopy(drivers)
 
     def setDriver(self, driver, value, report=True, force=False, uom=None):
-        if driver in self.drivers:
-            self.drivers[driver]['value'] = value
-            if uom is not None:
-                self.drivers[driver]['uom'] = uom
-            if report:
-                self.reportDriver(driver, self.drivers[driver], report, force)
+        try:
+            if driver in self.drivers:
+                self.drivers[driver]['value'] = str(value)
+                if uom is not None:
+                    self.drivers[driver]['uom'] = str(uom)
+                if report:
+                    self.reportDriver(driver, self.drivers[driver], report, force)
+        except Exception as e:
+            LOGGER.error('setDriver: {}'.format(e), exc_info=True)
 
     def reportDriver(self, name, driver, report, force):
-        if str(self._drivers[name]['value']) is not str(driver['value']) or self._drivers[name]['uom'] is not driver['uom'] or force:
-            LOGGER.info('Updating Driver {} - {}: {}, uom: {}'.format(self.address, name, driver['value'], driver['uom']))
-            self._drivers[name]['value'] = deepcopy(driver['value'])
-            if self._drivers[name]['uom'] != driver['uom']:
-                self._drivers[name]['uom'] = deepcopy(driver['uom'])
-            message = {
-                'status': {
-                    'address': self.address,
-                    'driver': name,
-                    'value': str(driver['value']),
-                    'uom': driver['uom']
+        try:
+            new = self.drivers[name]
+            existing = self._drivers[name]
+            if (new['value'] != existing['value'] or new['uom'] != existing['uom'] or force):
+                LOGGER.info('Updating Driver {} - {}: {} uom: {}'.format(self.address, name, new['value'], new['uom']))
+                message = {
+                    'status': {
+                        'address': self.address,
+                        'driver': name,
+                        'value': driver['value'],
+                        'uom': driver['uom']
+                    }
                 }
-            }
-            self.controller.poly.send(message)
+                self.controller.poly.send(message)
+        except Exception as e:
+            LOGGER.error('reportDriver: {}'.format(e), exc_info=True)
 
     def reportCmd(self, command, value=None, uom=None):
         message = {
@@ -348,7 +351,7 @@ class Node(object):
 
     def reportDrivers(self):
         LOGGER.info('Updating All Drivers to ISY for {}({})'.format(self.name, self.address))
-        self.updateDrivers(self.drivers)
+        # self.updateDrivers(self.drivers)
         for name, driver in self.drivers.items():
             message = {
                 'status': {
@@ -378,12 +381,7 @@ class Node(object):
         pass
 
     def getDriver(self, dv):
-        for index, node in enumerate(self.controller.poly.config['nodes']):
-            if node['address'] == self.address:
-                for index, driver in enumerate(node['drivers']):
-                    if driver['driver'] == dv:
-                        return driver['value']
-        return None
+        return self.controller.polyConfig.nodes[self.address][dv].value or None
 
     def toJSON(self):
         LOGGER.debug(json.dumps(self.__dict__))
@@ -448,11 +446,14 @@ class Controller(Node):
         for address, node in config['nodes'].items():
             self._nodes[address] = node
             if address in self.nodes:
-                n = self.nodes[address]
-                n.updateDrivers(node['drivers'])
-                n.config = node
-                n.timeAdded = node['timeAdded']
-                n.isPrimary = node['isPrimary']
+                currentNode = self.nodes[address]
+                setattr(currentNode, '_drivers', deepcopy(node['drivers']))
+                setattr(currentNode, 'config', deepcopy(node))
+                setattr(currentNode, 'timeAdded', deepcopy(node['timeAdded']))
+                setattr(currentNode, 'isPrimary', deepcopy(node['isPrimary']))
+                #self.nodes[address].config = node
+                #self.nodes[address].timeAdded = node['timeAdded']
+                #self.nodes[address].isPrimary = node['isPrimary']
         if self.address not in self._nodes:
             self.addNode(self)
             LOGGER.info('Waiting on Controller node to be added.......')
@@ -460,6 +461,7 @@ class Controller(Node):
             self.nodes[self.address] = self
             self.started = True
             # self.setDriver('ST', 1, True, True)
+            time.sleep(1)
             self.start()
 
     def _startThreads(self):
@@ -509,6 +511,7 @@ class Controller(Node):
             if 'addnode' in result:
                 if result['addnode']['success']:
                     if not result['addnode']['address'] == self.address:
+                        time.sleep(1)
                         self.nodes[result['addnode']['address']].start()
                     # self.nodes[result['addnode']['address']].reportDrivers()
                     if result['addnode']['address'] in self.nodesAdding:
@@ -516,6 +519,7 @@ class Controller(Node):
                 else:
                     del self.nodes[result['addnode']['address']]
         except (KeyError, ValueError) as err:
+            print(err)
             LOGGER.error('handleResult: {}'.format(err), exc_info=True)
 
     def _delete(self):
