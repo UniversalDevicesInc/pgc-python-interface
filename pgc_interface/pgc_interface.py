@@ -19,9 +19,11 @@ except ImportError:
 import re
 import sys
 import select
+import time
 import socket
 import struct
-import threading
+from threading import Thread
+from .pythonjsonlogger import jsonlogger
 import warnings
 
 # from polyinterface import __features__
@@ -29,15 +31,42 @@ import warnings
 SOCKETFILE = '/tmp/pgsocket.sock'
 LOGFILE = '/tmp/pglog.sock'
 
+class JsonFormatter(jsonlogger.JsonFormatter, object):
+    def __init__(self,
+                 fmt="%(name) %(processName) %(filename) %(funcName) %(levelname) %(lineno) %(module) %(threadName) %(message)",
+                 datefmt="%Y-%m-%dT%H:%M:%SZ%z",
+                 style='%',
+                 *args, **kwargs):
+        # self._extra = extra
+        jsonlogger.JsonFormatter.__init__(self, fmt=fmt, datefmt=datefmt, *args, **kwargs)
+
+    def process_log_record(self, log_record):
+        # Enforce the presence of a timestamp
+        log_record["timestamp"] = int(time.time()*1000)
+        return super(JsonFormatter, self).process_log_record(log_record)
+
+class SysLogJsonHandler(logging.handlers.SysLogHandler, object):
+    # Override constructor
+    def __init__(self, address=('localhost', logging.handlers.SYSLOG_UDP_PORT),
+                 facility=logging.handlers.SysLogHandler.LOG_USER, socktype=None, prefix=""):
+        super(SysLogJsonHandler, self).__init__(address, facility, socktype)
+        self._prefix = prefix
+        if self._prefix != "":
+            self._prefix = prefix + ": "
+
+    # Override format method to handle prefix
+    def format(self, record):
+        return self._prefix + super(SysLogJsonHandler, self).format(record)
+
 def warning_on_one_line(message, category, filename, lineno, file=None, line=None):
     return '{}:{}: {}: {}'.format(filename, lineno, category.__name__, message)
 
 def setup_log():
     # Log Location
     # path = os.path.dirname(sys.argv[0])
-    # if not os.path.exists('./logs'):
-    #   os.makedirs('./logs')
-    # log_filename = "./logs/debug.log"
+    if not os.path.exists('/app/logs'):
+        os.makedirs('/app/logs')
+    log_filename = '/app/logs/debug.txt'
     log_level = logging.DEBUG  # Could be e.g. "DEBUG" or "WARNING"
 
     # ### Logging Section ################################################################################
@@ -50,15 +79,18 @@ def setup_log():
     # Set the log level to LOG_LEVEL
     # Make a handler that writes to a file,
     # making a new file at midnight and keeping 3 backups
-    # handler = logging.handlers.TimedRotatingFileHandler(log_filename, when="midnight", backupCount=30)
-    handler = logging.handlers.SysLogHandler(LOGFILE, socktype=socket.SOCK_STREAM)
+    handler = logging.handlers.TimedRotatingFileHandler(log_filename, when="midnight", backupCount=7)
+    handler2 = SysLogJsonHandler(LOGFILE, socktype=socket.SOCK_STREAM)
     # Format each log message like this
-    formatter = logging.Formatter('[%(threadName)-8.8s] [%(levelname)-7s]: %(message)s')
+    formatter = JsonFormatter()
+    # formatter = logging.Formatter('[%(threadName)-8.8s] [%(levelname)-7s]: %(message)s')
     # formatter = logging.Formatter('{"log": {"thread": "%(threadName)s", "levelname": "%(levelname)s", "msg": "%(message)s"}}')
     # Attach the formatter to the handler
     handler.setFormatter(formatter)
+    handler2.setFormatter(formatter)
     # Attach the handler to the logger
     logger.addHandler(handler)
+    logger.addHandler(handler2)
     warnlog.addHandler(handler)
     return logger
 
@@ -80,7 +112,7 @@ class Interface(object):
         self.loop = None
         self.inQueue = queue.Queue()
         self._threads = {}
-        self._threads['socket'] = threading.Thread(target = self._message, name='Socket')
+        self._threads['socket'] = Thread(target = self._message, name='Interface')
         self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.isyVersion = None
         self.__configObservers = []
@@ -420,12 +452,14 @@ class Controller(Node):
             self._nodes = {}
             self.config = None
             self.nodes = { self.address: self }
+            self._threads = {}
+            self._threads['input'] = Thread(target = self._parseInput, name = 'Controller')
+            self._threads['ns']  = Thread(target = self.start, name = 'NodeServer')
             self.polyConfig = None
             self.timeAdded = None
             self.isPrimary = True
             self.started = False
             self.nodesAdding = []
-            self._threads = []
             self._startThreads()
         except (KeyError) as err:
             LOGGER.error('Error Creating node: {}'.format(err), exc_info=True)
@@ -461,15 +495,13 @@ class Controller(Node):
             self.nodes[self.address] = self
             self.started = True
             # self.setDriver('ST', 1, True, True)
-            time.sleep(1)
-            self.start()
+            # time.sleep(1)
+            self._threads['ns'].start()
 
     def _startThreads(self):
-        for i in range(1):
-            t = threading.Thread(target=self._parseInput, name='NS Input')
-            t.daemon = True
-            t.start()
-            self._threads.append(t)
+        self._threads['input'].daemon = True
+        self._threads['ns'].daemon = True
+        self._threads['input'].start()
 
     def _parseInput(self):
         while self.poly.running:
@@ -585,8 +617,7 @@ class Controller(Node):
             self.nodes[node].reportDrivers()
 
     def runForever(self):
-        for thread in self._threads:
-            thread.join()
+        self._threads['input'].join()
 
     def start(self):
         pass
