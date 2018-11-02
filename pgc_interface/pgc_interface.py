@@ -522,6 +522,8 @@ class Controller(Node):
                         self.shortPoll()
                     elif key == 'longPoll':
                         self.longPoll()
+                    elif key == 'oauth':
+                        self.oauth(input[key])
                     elif key == 'query':
                         if input[key]['address'] in self.nodes:
                             self.nodes[input[key]['address']].query()
@@ -603,6 +605,9 @@ class Controller(Node):
     def longPoll(self):
         pass
 
+    def oauth(self, oauth):
+        pass
+        
     def shortPoll(self):
         pass
 
