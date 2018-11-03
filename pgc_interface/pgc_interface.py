@@ -149,7 +149,8 @@ class Interface(object):
                 for msg in messages:
                     if msg is not '' or msg is not None:
                         parsed_msg = json.loads(msg)
-                        inputCmds = ['query', 'command', 'result', 'status', 'shortPoll', 'longPoll', 'delete']
+                        inputCmds = ['query', 'command', 'result', 'status', 'shortPoll', 'longPoll', 'delete', 'oauth']
+                        ignoreList = ['clientId']
                         for key in parsed_msg:
                             if key == 'init':
                                 LOGGER.debug('Recieved Message: init')
@@ -164,6 +165,8 @@ class Interface(object):
                             elif key in inputCmds:
                                 LOGGER.debug('Received Message: {}'.format(parsed_msg))
                                 self.inQueue.put(parsed_msg)
+                            elif key in ignoreList:
+                                pass
                             else:
                                 LOGGER.error('Invalid command received in message from Polyglot: {}'.format(key))
             except (ValueError, json.decoder.JSONDecodeError) as err:
@@ -606,7 +609,7 @@ class Controller(Node):
         pass
 
     def oauth(self, oauth):
-        pass
+        LOGGER.info('Recieved oauth {}'.format(oauth))
         
     def shortPoll(self):
         pass
