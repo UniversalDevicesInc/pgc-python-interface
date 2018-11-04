@@ -19,18 +19,18 @@ Caveats:
 
 When you start building a NodeServer you are helping build the free and open Internet of Things. Thank you! If you run in to any issues please ask your questions on the [UDI Polyglot Forums](http://forum.universal-devices.com/forum/111-polyglot/).
 
-To get started, build your nodeserver using the on-premise version of Polyglot, you should not do builds in the cloud. [Use this link to get started on your build.](https://github.com/UniversalDevicesInc/polyglot-v2-python-interface/blob/master/README.md)
+To get started, build your NodeServer using the on-premise version of Polyglot, you should not do builds in the cloud. [Use this link to get started on your build.](https://github.com/UniversalDevicesInc/polyglot-v2-python-interface/blob/master/README.md)
 
 ### Enabling your NodeServer to be installable in the cloud
 
-Polyglot Cloud uses ephermeral docker images to run NodeServers. Nothing is persistent, so every time a NodeServer is stopped the docker is removed every time a NodeServer starts, a docker is run. We cut down on start times by instances 'pre-warmed' and ready for start calls. Due to this ephemeral nature, you should not save ANY necessary information to local storage. Use the standard customData or customParams methods to save state and or keys.
+Polyglot Cloud uses ephemeral docker images to run NodeServers. Nothing is persistent, so every time a NodeServer is stopped the docker is removed every time a NodeServer starts, a docker is run. We cut down on start times by instances 'pre-warmed' and ready for start calls. Due to this ephemeral nature, you should not save ANY necessary information to local storage. Use the standard customData or customParams methods to save state and or keys.
 
-Enabling your nodeserver to install in the cloud is simple:
+Enabling your NodeServer to install in the cloud is simple:
 * Add an additional property to server.json "install_cloud"
 
 [Polyglot NodeServer Template Example](https://github.com/Einstein42/udi-poly-template-python/blob/master/server.json)
 
-By default a script is run when you install a nodeserver using the server.json's 'install' property. In the cloud you may have slightly different requirements. By default pgc_interface has to be your API module instead of on-prem's poly_interface.
+By default a script is run when you install a NodeServer using the server.json's 'install' property. In the cloud you may have slightly different requirements. By default pgc_interface has to be your API module instead of on-prem's poly_interface.
 
 Using the aforementioned Polyglot NodeServer Template Example we added 
 
@@ -56,11 +56,11 @@ One of the best reasons to move a NodeServer to the cloud is for Oauth workflows
 When you create your service provider's integration, use the Oauth callback URL of:
 * https://polyglot.isy.io/api/oauth/callback
 
-This is the same for ANY oauth2 NodeServers. We simply passthrough using a state identifier below, so none of the information is ever saved by UDI.
+This is the same for ANY oauth2 NodeServers. We simply pass-through using a state identifier below, so none of the information is ever saved by UDI.
 
 When you enable this flow, you will provide UDI with the Oauth2 information that you will need for your NodeServer and it is sent back to your NodeServer in the init call that is sent to every NodeServer on startup. This is to prevent you having to store keys/secrets in your repository. Inside the init json message you will have an 'oauth' parameter that can have the following kinds of information:
 
-* url: This will be the URL that you will have to point users to for inital authorization Example: https://home.nest.com/login/oauth2?client_id=XXXXXXXXXXX&state=
+* url: This will be the URL that you will have to point users to for initial authorization Example: https://home.nest.com/login/oauth2?client_id=XXXXXXXXXXX&state=
 * clientId: This is the clientId for your integration via the cloud provider
 * clientSecret: This is the clientSecret for your integration.
 
