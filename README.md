@@ -1,5 +1,3 @@
-[![Build Status](https://travis-ci.org/UniversalDevicesInc/pgc-python-interface.svg?branch=master)](https://travis-ci.org/UniversalDevicesInc/pgc-python-interface)
-
 # UDI Polyglot v2 - Cloud Interface Module :: PGC
 
 This is the Polyglot interface API module that is portable to be imported into your Python 3.4+ based NodeServers.
