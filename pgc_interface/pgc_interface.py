@@ -219,6 +219,8 @@ class Interface(object):
                 'isController': True if hasattr(node, 'isController') else False
             }
         }
+        if node.hint is not None:
+            message['addnode']['hint'] = node.hint
         self.send(message)
 
     def removeNode(self, address):
@@ -426,6 +428,7 @@ class Node(object):
     commands = {}
     drivers = {}
     sends = {}
+    hint = None
 
 
 class Controller(Node):
