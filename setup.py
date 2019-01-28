@@ -13,7 +13,9 @@ setup(name='pgc_interface',
     author_email=metadata['authoremail'],
     license=metadata['license'],
     packages=find_packages(),
-    install_requires=[],
+    install_requires=[
+        'paho-mqtt'
+    ],
     python_requires='>2.7,!=3.0.*,!=3.1.*,!=3.2.*',
     zip_safe=False,
     # See https://pypi.python.org/pypi?%3Aaction=list_classifiers
