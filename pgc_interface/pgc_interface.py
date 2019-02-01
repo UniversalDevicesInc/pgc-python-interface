@@ -15,6 +15,7 @@ import binascii
 # from os.path import join, expanduser
 import paho.mqtt.client as mqtt
 from urllib.parse import urlparse
+from urllib.request import urlopen
 try:
     import queue
 except ImportError:
@@ -120,6 +121,7 @@ class Interface(object):
             self.init = json.loads(os.environ['NODESERVER'])
             self.stage = os.environ['STAGE']
             self.mqttUrl = os.environ['MQTTURL']
+            self._pgUrl = os.environ['PGURL']
             self.profileNum = self.init['profileNum']
             self.userId = self.init['userId']
             self.worker = self.init['worker']
@@ -203,9 +205,7 @@ class Interface(object):
             self._mqttc.connect_async(urlparts.netloc, 443, 10)
             self._mqttc.loop_forever()
         except Exception as ex:
-            template = "An exception of type {0} occurred. Arguments:\n{1!r}"
-            message = template.format(type(ex).__name__, ex.args)
-            LOGGER.error("MQTT Connection error: {}".format(message), exc_info=True)
+            LOGGER.error("MQTT Connection error: {}".format(err), exc_info=True)
 
     def _connect(self, mqttc, userdata, flags, rc):
         """
@@ -295,11 +295,17 @@ class Interface(object):
         if rc != 0:
             LOGGER.info("MQTT Unexpected disconnection. Trying reconnect.")
             try:
-                self._mqttc.reconnect()
-            except Exception as ex:
-                template = "An exception of type {0} occured. Arguments:\n{1!r}"
-                message = template.format(type(ex).__name__, ex.args)
-                LOGGER.error("MQTT Connection error: " + message)
+                urlData = urlopen(self._pgUrl)
+                data = urlData.read()
+                encoding = urlData.info().get_content_charset('utf-8')
+                jsonData = json.loads(data.decode(encoding))
+                self.mqttUrl = jsonData['mqttUrl']
+                self._mqttc.loop_stop()
+                self._mqttc.reinitialise(client_id=self.worker, clean_session=True, transport="websockets")
+                self._startMqtt()
+            except Exception as err:
+                LOGGER.error("MQTT Connection error: {}".format(err), exc_info=True)
+                self.stop()
         else:
             LOGGER.info("MQTT Graceful disconnection.")
 
