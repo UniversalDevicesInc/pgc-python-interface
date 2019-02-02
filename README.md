@@ -56,14 +56,14 @@ We have now created the ability to locally run your NodeServer on the developmen
 * You must have docker installed on the machine you plan to test with. This is outside the scope of this document.
 * Use the test platform at https://pgtest.isy.io/
 * Add any NodeServer using the store as normal, but use the checkbox 'development' in the Add NodeServer dialog.
-* For Python NodeServers use [this Dockerfile](https://github.com/UniversalDevicesInc/pgc_nodeserver/blob/beta/Dockerfile)
-* For Node.JS NodeServers use [this Dockerfile](https://github.com/UniversalDevicesInc/pgc_nodeserver/blob/beta/Dockerfile.node)
+* For Python NodeServers use [this Dockerfile](https://github.com/UniversalDevicesInc/pgc_nodeserver/blob/beta/Dockerfile.test)
+* For Node.JS NodeServers use [this Dockerfile](https://github.com/UniversalDevicesInc/pgc_nodeserver/blob/beta/Dockerfile.node.test)
 * Modify the DockerFile to add your local code
 
 Save the Dockerfile as 'Dockerfile' regardless of which one you use. Place the DockerFile somewhere below your NodeServer code. E.G. ~/dev/ if your NodeServer sits at ~/dev/nodeserver.
 The reason for this is that Docker will not allow you to copy files from outside its path into it for security reasons.
-You will notice the line "# COPY ecobee/ /app/template/"
-Uncomment it by removing the # and then change ecobee to the folder of your NodeServer. Leave /app/template/ as the destination or it will not work.
+You will notice the line "COPY ecobee/ /app/template/"
+Change ecobee to the folder of your NodeServer. Leave /app/template/ as the destination or it will not work.
 
 * Grab the Docker PGURL from the Details page of the NodeServer on the website. It should look like this
 ```
@@ -74,7 +74,7 @@ This PGURL is an encoded string of details for your NodeServer, so testing will 
 Then create a script in the same location as the Dockerfile. Something like 'run_local.sh'. Copy the following commands into it:
 ```
 #!/bin/bash
-docker build --rm -t mynodeserver .
+docker build --rm -t mynodeserver -f Dockerfile.test .
 docker run -it \
   -e PGURL='https://pxu4jgaiue.execute-api.us-east-1.amazonaws.com/test/api/sys/nsgetioturl?params=' \
   -e LOCAL=true \
