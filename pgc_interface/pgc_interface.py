@@ -301,7 +301,7 @@ class Interface(object):
                 jsonData = json.loads(data.decode(encoding))
                 self.mqttUrl = jsonData['mqttUrl']
                 self._mqttc.loop_stop()
-                self._mqttc.reinitialise(client_id=self.worker, clean_session=True, transport="websockets")
+                self._mqttc.reinitialise(client_id=self.worker)
                 self._startMqtt()
             except Exception as err:
                 LOGGER.error("MQTT Connection error: {}".format(err), exc_info=True)
