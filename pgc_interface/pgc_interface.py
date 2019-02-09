@@ -13,7 +13,8 @@ import os
 import zlib
 import binascii
 # from os.path import join, expanduser
-import paho.mqtt.client as mqtt
+# import paho.mqtt.client as mqtt
+from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient as mqttClient
 from urllib.parse import urlparse
 from urllib.request import urlopen
 try:
@@ -26,7 +27,7 @@ import time
 import base64
 import select
 from .pythonjsonlogger import jsonlogger
-from threading import Thread, Event
+from threading import Thread, Event, current_thread
 import warnings
 
 # from polyinterface import __features__
@@ -98,7 +99,7 @@ class MQTTHandler(logging.Handler):
     def emit(self, record):
         msg = self.format(record)
         if self.interface.connected:
-            self.interface._mqttc.publish(self.topic, msg, retain=False)
+            self.interface._mqttc.publish(self.topic, msg, 0)
 
 
 LOGGER = setup_log()
@@ -120,8 +121,7 @@ class Interface(object):
             self.connected = False
             self.init = json.loads(os.environ['NODESERVER'])
             self.stage = os.environ['STAGE']
-            self.mqttUrl = os.environ['MQTTURL']
-            self._pgUrl = os.environ['PGURL']
+            self.mqttEndpoint = os.environ['MQTTENDPOINT']
             self.profileNum = self.init['profileNum']
             self.userId = self.init['userId']
             self.worker = self.init['worker']
@@ -155,13 +155,13 @@ class Interface(object):
         self.inQueue = queue.Queue()
         self._threads = {}
         self._threads['socket'] = Thread(target = self._startMqtt, name='Interface')
-        self._mqttc = mqtt.Client(client_id=self.worker, clean_session=True, transport="websockets")
-        self._mqttc.on_connect = self._connect
-        self._mqttc.on_message = self._message
-        self._mqttc.on_subscribe = self._subscribe
-        self._mqttc.on_disconnect = self._disconnect
-        self._mqttc.on_publish = self._publish
-        self._mqttc.on_log = self._log
+        self._mqttc = mqttClient(self.worker)
+        #self._mqttc.onOnline = self._connect
+        self._mqttc.onMessage = self._message
+        # self._mqttc.on_subscribe = self._subscribe
+        self._mqttc.onOffline = self._disconnect
+        # self._mqttc.on_publish = self._publish
+        # self._mqttc.on_log = self._log
         # self._mqttc.enable_logger(logger=LOGGER)
         self.isyVersion = None
         self.running = True
@@ -187,27 +187,29 @@ class Interface(object):
         The client start method. Starts the thread for the MQTT Client
         and publishes the connected message.
         """
-        LOGGER.info('Connecting to MQTT...')
+        LOGGER.info('Connecting to MQTT endpoint {}...'.format(self.mqttEndpoint))
         try:
-            urlparts= urlparse(self.mqttUrl)
-            headers = {
-                "Host": "{0:s}".format(urlparts.netloc)
-            }
-            self._mqttc.ws_set_options(path="{}?{}".format(urlparts.path, urlparts.query), headers=headers)
-            self._mqttc.tls_set()
-            self._mqttc.will_set(self.sendTopic, json.dumps({
+            self._mqttc.configureEndpoint(self.mqttEndpoint, 8883)
+            self._mqttc.configureCredentials('/app/certs/AmazonRootCA1.pem',
+                '/app/certs/private.key',
+                '/app/certs/iot.crt')
+            # Configure the auto-reconnect backoff to start with 1 second and use 60 seconds as a maximum back off time.
+            # Connection over 20 seconds is considered stable and will reset the back off time back to its base.
+            self._mqttc.configureAutoReconnectBackoffTime(1, 60, 20)
+            self._mqttc.configureLastWill(self.sendTopic, json.dumps({
                 'connected': False,
                 'userId': self.userId,
                 'topic': self.recvTopic,
                 'profileNum': self.profileNum,
                 'id': self.id
-                }))
-            self._mqttc.connect_async(urlparts.netloc, 443, 10)
-            self._mqttc.loop_forever()
-        except Exception as ex:
+                }), 0)
+            if self._mqttc.connect():
+                self._connect()
+        except Exception as err:
             LOGGER.error("MQTT Connection error: {}".format(err), exc_info=True)
 
-    def _connect(self, mqttc, userdata, flags, rc):
+    #def _connect(self, mqttc, userdata, flags, rc):
+    def _connect(self):
         """
         The callback for when the client receives a CONNACK response from the server.
         Subscribing in on_connect() means that if we lose the connection and
@@ -218,33 +220,24 @@ class Interface(object):
         :param flags: The flags set on the connection.
         :param rc: Result code of connection, 0 = Success, anything else is a failure
         """
-        if rc == 0:
-            self.connected = True
-            results = []
-            LOGGER.info("MQTT Connected with result code " + str(rc) + " (Success)")
-            results.append((self.recvTopic, tuple(self._mqttc.subscribe(self.recvTopic))))
-            for (topic, (result, mid)) in results:
-                if result == 0:
-                    LOGGER.info("MQTT Subscribed to topic: " + topic + " - " + " MID: " + str(mid) + " Result: " + str(result))
-                else:
-                    LOGGER.info("MQTT Subscription to " + topic + " failed. This is unusual. MID: " + str(mid) + " Result: " + str(result))
-                    # If subscription fails, try to reconnect.
-                    self._mqttc.reconnect()
-            self.inConfig(self.init)
-            self.send({'connected': True})
-            try:
-                if self.firstRun:
-                    self.updatePollsInPG(self.serverFile)
-                    self.updatePolls(self.serverFile)
-                    self.installprofile()
-                else:
-                    self.updatePolls(self.init)
-            except Exception as err:
-                LOGGER.error('Poll thread error: {}'.format(err), exc_info=True)
-        else:
-            LOGGER.error("MQTT Failed to connect. Result code: " + str(rc))
+        self.connected = True
+        LOGGER.info('MQTT Connected successfully to: {}'.format(self.mqttEndpoint))
+        if self._mqttc.subscribe(self.recvTopic, 0, None):
+            LOGGER.info('MQTT Subscribed to topic: {}'.format(self.recvTopic))
+        self.inConfig(self.init)
+        self.send({'connected': True})
+        try:
+            if self.firstRun:
+                self.updatePollsInPG(self.serverFile)
+                self.updatePolls(self.serverFile)
+                self.installprofile()
+            else:
+                self.updatePolls(self.init)
+        except Exception as err:
+            LOGGER.error('Poll thread error: {}'.format(err), exc_info=True)
 
-    def _message(self, mqttc, userdata, msg):
+    # def _message(self, mqttc, userdata, msg):
+    def _message(self, msg):
         """
         The callback for when a PUBLISH message is received from the server.
 
@@ -253,6 +246,7 @@ class Interface(object):
         :param flags: The flags set on the connection.
         :param msg: Dictionary of MQTT received message. Uses: msg.topic, msg.qos, msg.payload
         """
+        current_thread().name = "MQTT"
         try:
             parsed_msg = json.loads(msg.payload.decode('utf-8'))
             inputCmds = ['query', 'command', 'result', 'status', 'shortPoll', 'longPoll', 'oauth', 'delete']
@@ -283,7 +277,8 @@ class Interface(object):
         except (Exception, ValueError, json.decoder.JSONDecodeError) as err:
             LOGGER.error('MQTT Received Payload Error: {} :: {}'.format(err, repr(msg)), exc_info=True)
 
-    def _disconnect(self, mqttc, userdata, rc):
+    # def _disconnect(self, mqttc, userdata, rc):
+    def _disconnect(self):
         """
         The callback for when a DISCONNECT occurs.
 
@@ -292,22 +287,7 @@ class Interface(object):
         :param rc: Result code of connection, 0 = Graceful, anything else is unclean
         """
         self.connected = False
-        if rc != 0:
-            LOGGER.info("MQTT Unexpected disconnection. Trying reconnect.")
-            try:
-                urlData = urlopen(self._pgUrl)
-                data = urlData.read()
-                encoding = urlData.info().get_content_charset('utf-8')
-                jsonData = json.loads(data.decode(encoding))
-                self.mqttUrl = jsonData['mqttUrl']
-                self._mqttc.loop_stop()
-                self._mqttc.reinitialise(client_id=self.worker)
-                self._startMqtt()
-            except Exception as err:
-                LOGGER.error("MQTT Connection error: {}".format(err), exc_info=True)
-                self.stop()
-        else:
-            LOGGER.info("MQTT Graceful disconnection.")
+        LOGGER.info("MQTT disconnected. Trying reconnect.")
 
     def _log(self, mqttc, userdata, level, string):
         """ Use for debugging MQTT Packets, disable for normal use, NOISY. """
@@ -363,12 +343,12 @@ class Interface(object):
                 logFile = '/app/logs/debug.log'
                 with open(logFile, 'rb') as f:
                     logFileData = f.read()
-                compressed = zlib.compress(logFileData, zlib.Z_BEST_COMPRESSION)
+                compressed = bytearray(zlib.compress(logFileData, zlib.Z_BEST_COMPRESSION))
                 compressRatio = 100.0 * ((float(len(logFileData)) - float(len(compressed))) / float(len(logFileData)))
+                LOGGER.addHandler(self.mqttLogHandler)
                 LOGGER.debug('Sending Logfile to frontend: {} :: Compressed {}%'.format(msg['clientId'], compressRatio))
                 # LOGGER.debug('Compressed: {}'.format(binascii.hexlify(compressed)))
-                self._mqttc.publish(self.logTopic + '/file', compressed)
-                LOGGER.addHandler(self.mqttLogHandler)
+                self._mqttc.publish(self.logTopic + '/file', compressed, 0)
             else:
                 if msg['clientId'] in self.__logObservers:
                     self.__logObservers.remove(msg['clientId'])
@@ -432,7 +412,7 @@ class Interface(object):
             message['profileNum'] = self.profileNum
             message['id'] = self.id
             LOGGER.debug('Sent Message: [{}] : {}'.format(topic, json.dumps(message)))
-            self._mqttc.publish(topic, json.dumps(message), retain=False)
+            self._mqttc.publish(topic, json.dumps(message), 0)
         except TypeError as err:
             LOGGER.error('MQTT Send Error: {}'.format(err), exc_info=True)
 

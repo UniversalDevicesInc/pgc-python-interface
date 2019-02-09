@@ -14,7 +14,7 @@ setup(name='pgc_interface',
     license=metadata['license'],
     packages=find_packages(),
     install_requires=[
-        'paho-mqtt'
+        'AWSIoTPythonSDK'
     ],
     python_requires='>2.7,!=3.0.*,!=3.1.*,!=3.2.*',
     zip_safe=False,
