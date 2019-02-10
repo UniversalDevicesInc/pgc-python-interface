@@ -138,9 +138,9 @@ In the inital init message that is sent to each NodeServer you will have a netIn
 
 ```
 {
-    publicPort: port
+    publicPort: <port>
     publicIp: "<ip>"
 }
 ```
 
-This will allow you to do whatever is necessary INBOUND to your instance.
+This will allow you to do whatever is necessary INBOUND to your instance. The port you will listen on with your NodeServer is always port 3000 the port you are provided is the public port that translates to port 3000 on your instance.
