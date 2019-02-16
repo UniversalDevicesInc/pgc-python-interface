@@ -195,6 +195,7 @@ class Interface(object):
                 '/app/certs/iot.crt')
             # Configure the auto-reconnect backoff to start with 1 second and use 60 seconds as a maximum back off time.
             # Connection over 20 seconds is considered stable and will reset the back off time back to its base.
+            self._mqttc.configureConnectDisconnectTimeout(30)
             self._mqttc.configureAutoReconnectBackoffTime(1, 60, 20)
             self._mqttc.configureLastWill(self.sendTopic, json.dumps({
                 'connected': False,
