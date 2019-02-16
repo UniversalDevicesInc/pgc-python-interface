@@ -204,7 +204,7 @@ class Interface(object):
                 'profileNum': self.profileNum,
                 'id': self.id
                 }), 0)
-            if self._mqttc.connect():
+            if self._mqttc.connect(10):
                 self._connect()
         except Exception as err:
             LOGGER.error("MQTT Connection error: {}".format(err), exc_info=True)
