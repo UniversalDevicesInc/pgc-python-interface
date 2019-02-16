@@ -156,7 +156,7 @@ class Interface(object):
         self._threads = {}
         self._threads['socket'] = Thread(target = self._startMqtt, name='Interface')
         self._mqttc = mqttClient(self.worker)
-        #self._mqttc.onOnline = self._connect
+        self._mqttc.onOnline = self._online
         self._mqttc.onMessage = self._message
         # self._mqttc.on_subscribe = self._subscribe
         self._mqttc.onOffline = self._disconnect
@@ -195,7 +195,7 @@ class Interface(object):
                 '/app/certs/iot.crt')
             # Configure the auto-reconnect backoff to start with 1 second and use 60 seconds as a maximum back off time.
             # Connection over 20 seconds is considered stable and will reset the back off time back to its base.
-            self._mqttc.configureConnectDisconnectTimeout(30)
+            # self._mqttc.configureConnectDisconnectTimeout(60)
             self._mqttc.configureAutoReconnectBackoffTime(1, 60, 20)
             self._mqttc.configureLastWill(self.sendTopic, json.dumps({
                 'connected': False,
@@ -204,13 +204,20 @@ class Interface(object):
                 'profileNum': self.profileNum,
                 'id': self.id
                 }), 0)
-            if self._mqttc.connect(10):
+            if self._mqttc.connect(30):
                 self._connect()
         except Exception as err:
             LOGGER.error("MQTT Connection error: {}".format(err), exc_info=True)
 
+    def _online(self):
+        if current_thread().name != "MQTT":
+            current_thread().name = "MQTT"
+        self.connected = True
+        LOGGER.info('MQTT Connected successfully to: {}'.format(self.mqttEndpoint))
+        self.send({'connected': True})
+
     #def _connect(self, mqttc, userdata, flags, rc):
-    def _connect(self):
+    def _connect(self,mid=None, data=None):
         """
         The callback for when the client receives a CONNACK response from the server.
         Subscribing in on_connect() means that if we lose the connection and
@@ -221,8 +228,6 @@ class Interface(object):
         :param flags: The flags set on the connection.
         :param rc: Result code of connection, 0 = Success, anything else is a failure
         """
-        self.connected = True
-        LOGGER.info('MQTT Connected successfully to: {}'.format(self.mqttEndpoint))
         if self._mqttc.subscribe(self.recvTopic, 0, None):
             LOGGER.info('MQTT Subscribed to topic: {}'.format(self.recvTopic))
         self.inConfig(self.init)
@@ -247,7 +252,6 @@ class Interface(object):
         :param flags: The flags set on the connection.
         :param msg: Dictionary of MQTT received message. Uses: msg.topic, msg.qos, msg.payload
         """
-        current_thread().name = "MQTT"
         try:
             parsed_msg = json.loads(msg.payload.decode('utf-8'))
             inputCmds = ['query', 'command', 'result', 'status', 'shortPoll', 'longPoll', 'oauth', 'delete']
