@@ -125,6 +125,7 @@ class Interface(object):
             self.profileNum = self.init['profileNum']
             self.userId = self.init['userId']
             self.worker = self.init['worker']
+            self.clientId = '{}_{}_{}'.format(self.worker, self.profileNum, self.userId)
             self.logBucket = self.init['logBucket']
             if self.worker is not 'none':
                 LOGGER.info('Running with WorkerID: {}'.format(self.worker))
@@ -155,7 +156,7 @@ class Interface(object):
         self.inQueue = queue.Queue()
         self._threads = {}
         self._threads['socket'] = Thread(target = self._startMqtt, name='Interface')
-        self._mqttc = mqttClient(self.worker)
+        self._mqttc = mqttClient(self.clientId)
         self._mqttc.onOnline = self._online
         self._mqttc.onMessage = self._message
         # self._mqttc.on_subscribe = self._subscribe
@@ -213,7 +214,7 @@ class Interface(object):
         if current_thread().name != "MQTT":
             current_thread().name = "MQTT"
         self.connected = True
-        LOGGER.info('MQTT Connected successfully to: {}'.format(self.mqttEndpoint))
+        LOGGER.info('MQTT Connected successfully to: {} as {}'.format(self.mqttEndpoint, self.clientId))
         self.send({'connected': True})
 
     #def _connect(self, mqttc, userdata, flags, rc):
