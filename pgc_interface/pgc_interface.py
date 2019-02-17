@@ -235,9 +235,10 @@ class Interface(object):
         self.send({'connected': True})
         try:
             if self.firstRun:
-                self.updatePollsInPG(self.serverFile)
+                LOGGER.debug('here')
                 self.updatePolls(self.serverFile)
                 self.installprofile()
+                self.updatePollsInPG(self.serverFile)
             else:
                 self.updatePolls(self.init)
         except Exception as err:
@@ -266,7 +267,8 @@ class Interface(object):
                     LOGGER.debug('Received stop from PGC... Shutting Down.')
                     self.stop()
                 elif key == 'polls':
-                    self.updatePolls(parsed_msg[key])
+                    #self.updatePolls(parsed_msg[key])
+                    pass
                 elif key == 'startLogStream' or key == 'stopLogStream':
                     self._streamLog(key, parsed_msg)
                 elif key == 'tailLog':
