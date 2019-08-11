@@ -769,8 +769,22 @@ class Controller(Node):
                         if input[key]['address'] in self.nodes:
                             try:
                                 self.nodes[input[key]['address']].runCmd(input[key])
+                                if 'query' in input[key] and 'requestId' in input[key]['query']:
+                                    self.poly.send({
+                                        'report': {
+                                            'requestId': input[key]['query']['requestId'],
+                                            'success': True
+                                        }
+                                    })
                             except (Exception) as err:
                                 LOGGER.error('_parseInput: failed {}.runCmd({}) {}'.format(input[key]['address'], input[key]['cmd'], err), exc_info=True)
+                                if 'query' in input[key] and 'requestId' in input[key]['query']:
+                                    self.poly.send({
+                                        'report': {
+                                            'requestId': input[key]['query']['requestId'],
+                                            'success': False
+                                        }
+                                    })
                         else:
                             LOGGER.error('_parseInput: received command {} for a node that is not in memory: {}'.format(input[key]['cmd'], input[key]['address']))
                     elif key == 'result':
