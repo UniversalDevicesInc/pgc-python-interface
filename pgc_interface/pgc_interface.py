@@ -775,7 +775,7 @@ class Controller(Node):
                                             'requestId': input[key]['query']['requestId'],
                                             'success': True
                                         }
-                                    })
+                                    }, 'isy')
                             except (Exception) as err:
                                 LOGGER.error('_parseInput: failed {}.runCmd({}) {}'.format(input[key]['address'], input[key]['cmd'], err), exc_info=True)
                                 if 'query' in input[key] and 'requestId' in input[key]['query']:
@@ -784,7 +784,7 @@ class Controller(Node):
                                             'requestId': input[key]['query']['requestId'],
                                             'success': False
                                         }
-                                    })
+                                    }, 'isy')
                         else:
                             LOGGER.error('_parseInput: received command {} for a node that is not in memory: {}'.format(input[key]['cmd'], input[key]['address']))
                     elif key == 'result':
