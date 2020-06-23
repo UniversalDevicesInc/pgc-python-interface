@@ -54,10 +54,13 @@ PGC 1.1.0 as of today moved into the test environment. There will be bugs. Howev
 
 We have now created the ability to locally run your NodeServer on the development platform. This gives you the ability to test and make sure everything is working properly before asking us to release it. Steps to take:
 * You must have docker installed on the machine you plan to test with. This is outside the scope of this document.
+  * Example: https://www.techiebouncer.com/2019/11/install-docker-and-docker-compose-on.html
 * Use the test platform at https://pgtest.isy.io/
-* Add any NodeServer using the store as normal, but use the checkbox 'development' in the Add NodeServer dialog.
+* Add any NodeServer using the store as normal, **but use the checkbox 'development'** in the Add NodeServer dialog.
 * For Python NodeServers use [this Dockerfile](https://github.com/UniversalDevicesInc/pgc_nodeserver/blob/beta/Dockerfile.test)
+  * wget https://raw.githubusercontent.com/UniversalDevicesInc/pgc_nodeserver/beta/Dockerfile.test -O Dockerfile
 * For Node.JS NodeServers use [this Dockerfile](https://github.com/UniversalDevicesInc/pgc_nodeserver/blob/beta/Dockerfile.node.test)
+  * wget https://raw.githubusercontent.com/UniversalDevicesInc/pgc_nodeserver/beta/Dockerfile.node.test -O Dockerfile
 * Modify the DockerFile to add your local code
 
 Save the Dockerfile as 'Dockerfile' regardless of which one you use. Place the DockerFile somewhere below your NodeServer code. E.G. ~/dev/ if your NodeServer sits at ~/dev/nodeserver.
